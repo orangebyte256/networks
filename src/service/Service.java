@@ -69,7 +69,7 @@ public class Service {
         }
     }
     private void listen() throws IOException {
-        DatagramSocket serverSocket = new DatagramSocket(9876);
+        DatagramSocket serverSocket = new DatagramSocket(PORT);
         byte[] receiveData = new byte[MESSAGE_LENGTH];
         long tmpTime = TIME_SEND_ALIVE;
         long start;
