@@ -1,4 +1,6 @@
 import math
+import time
+
 from message import Types
 from node import Node
 from receiver import Receiver
@@ -19,7 +21,8 @@ size = 2048
 sender = Sender()
 node = Node(sender)
 receiver = Receiver(sender, node)
-name = "Dima"
+name = "Name"
+timeout = 1.0
 
 def signal_handler(signal, frame):
         node.killed()
@@ -47,20 +50,25 @@ def main():
     inputs = [sock, sys.stdin]
     outputs = []
     if(parent == ""):
-        node.boss()
+        node.setBoss()
     else:
         sender.send(Types.CHILD, "", sys.argv[2])
         node.setParent(sys.argv[2])
+    timeRest = timeout
     while True:
-        readable, writable, exceptional = select.select(inputs, outputs, inputs)
-        for s in readable:
-            if s is sock:
-                data = sock.recv(size)
-                receiver.process(data, sock.getsockname()[0] + ":" + sock.getsockname()[1])
-            else:
-                input = sys.stdin.readline()
-                input = catString(input)
-                sender.send(Types.MSG, name + ":" + input, sock.getsockname()[0] + ":" + sock.getsockname()[1])
+        startTime = time.time()
+        readable, writable, exceptional = select.select(inputs, outputs, inputs, timeRest)
+        if readable:
+            for s in readable:
+                if s is sock:
+                    data = sock.recv(size)
+                    receiver.process(data, sock.getsockname()[0] + ":" + sock.getsockname()[1])
+                else:
+                    input = sys.stdin.readline()
+                    input = catString(input)
+                    sender.send(Types.MSG, name + ":" + input, sock.getsockname()[0] + ":" + sock.getsockname()[1])
+        else:
+            sender.cleaning()
 
 if __name__ == '__main__':
     main()
