@@ -63,6 +63,10 @@ def main():
                 if s is sock:
                     data = sock.recv(size)
                     receiver.process(data, sock.getsockname()[0] + ":" + sock.getsockname()[1])
+                    endTime = startTime - time.time()
+                    timeRest -= endTime
+                    if (timeRest <= 0):
+                        timeRest = timeout
                 else:
                     input = sys.stdin.readline()
                     input = catString(input)
