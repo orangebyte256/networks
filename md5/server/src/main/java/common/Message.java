@@ -11,8 +11,8 @@ public enum Message
     {
         this.value = value;
     }
-    public byte[] toByte()
+    public byte toByte()
     {
-        return new Integer(value).toString().getBytes();
+        return (byte)value;
     }
 }

@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
 /**
@@ -23,21 +25,17 @@ class Piece
 {
     State state;
     double TTL;
+    double time = 0;
+    Date oldTime = new Date();
     Piece(State state, double ttl)
     {
         this.state = state;
         this.TTL = ttl;
     }
-    void timeLeft(double time)
-    {
-        TTL -= time;
-        if(TTL < 0)
-        {
-            state = State.FREE;
-        }
-    }
     public void busy()
     {
+        time = TTL;
+        oldTime = new Date();
         state = State.BUSY;
     }
     public void calculated()
@@ -46,6 +44,11 @@ class Piece
     }
     public boolean isFree()
     {
+        if(state == State.CALCULATED)
+            return false;
+        time -= (double)(new Date().getTime() - oldTime.getTime()) / 1000.0;
+        if(time <= 0)
+            state = State.FREE;
         return state == State.FREE;
     }
 }
@@ -60,12 +63,13 @@ public class Server {
     static private final double TTL = 3.0;
     ArrayList<Piece> pieces;
     ServerSocketChannel server = null;
-    Server(String hash, String port) throws IOException {
+    Server(String hash, String port) throws IOException, NoSuchAlgorithmException {
         this.port = Integer.parseInt(port);
         this.hash = ByteBuffer.allocate(Parameters.HASH_SIZE);
         this.hash.position(0);
-        System.err.print(hash.getBytes().length);
-        this.hash.put(hash.getBytes());
+        MessageDigest md = MessageDigest.getInstance("MD5");
+        System.err.print("Server start");
+        this.hash.put(md.digest(hash.getBytes()));
         this.hash.position(0);
         pieces = new ArrayList<>();
         for(int i = 0; i < MAX_COUNT; i++)
@@ -73,7 +77,14 @@ public class Server {
             pieces.add(new Piece(State.FREE, TTL));
         }
     }
-
+    String bytebufferToString(ByteBuffer buffer)
+    {
+        buffer.flip();
+        byte[] array = new byte[buffer.remaining()];
+        buffer.get(array);
+        buffer.flip();
+        return new String(array);
+    }
     void work() throws IOException
     {
         server = ServerSocketChannel.open();
@@ -98,23 +109,41 @@ public class Server {
                     SocketChannel channel = (SocketChannel) key.channel();
                     if(channel == findedChannel)
                     {
-                        if(channel.read(findedBuffer) == -1)
-                        {
-                            System.out.println(Integer.parseInt(findedBuffer.toString()));
+                        int count = 0;
+                        try {
+                            if ((count = channel.read(findedBuffer)) == -1)
+                            {
+                                System.out.println(bytebufferToString(findedBuffer));
+                                channel.close();
+                            }
+                            keyIterator.remove();
+                            continue;
                         }
-                        break;
+                        catch (IOException e)
+                        {
+                            e.printStackTrace();
+                        }
                     }
                     if(channels.containsKey(channel))
                     {
                         if(channel.read(channels.get(channel)) == -1)
                         {
-                            pieces.get(Integer.parseInt(findedBuffer.toString())).calculated();
+                            String s = bytebufferToString(channels.get(channel));
+                            pieces.get(Integer.parseInt(s)).calculated();
+                            System.err.println(s);
+                            channel.close();
                         }
-                        break;
+                        keyIterator.remove();
+                        continue;
                     }
                     ByteBuffer byteBuffer = ByteBuffer.allocate(1);
-                    channel.read(byteBuffer);
-                    switch (Message.values()[byteBuffer.get(0)])
+                    if(channel.read(byteBuffer) == -1)
+                    {
+                        channel.close();
+                        continue;
+                    }
+                    byteBuffer.flip();
+                    switch (Message.values()[byteBuffer.get()])
                     {
                         case GET_HASH:
                             channel.write(hash);
@@ -123,22 +152,33 @@ public class Server {
                         case GET_WORK:
                             bufferNum.clear();
                             bufferNum.position(0);
+                            boolean isFind = false;
                             for(int i = 0; i < MAX_COUNT; i++)
                             {
                                 if(pieces.get(i).isFree())
                                 {
                                     Integer tmp = i;
                                     bufferNum.put(tmp.toString().getBytes());
-                                    bufferNum.position(0);
+                                    bufferNum.flip();
                                     pieces.get(i).busy();
+                                    isFind = true;
+                                    break;
                                 }
                             }
+                            if(!isFind)
+                            {
+                                Integer tmp = -1;
+                                bufferNum.put(tmp.toString().getBytes());
+                                bufferNum.flip();
+                            }
                             channel.write(bufferNum);
+                            channel.close();
                             break;
                         case CALCULATED:
                             channels.put(channel, ByteBuffer.allocate(Parameters.MAX_SIZE));
                             break;
                         case FINDED:
+                            findedBuffer.clear();
                             findedChannel = channel;
                             break;
                     }
@@ -148,15 +188,16 @@ public class Server {
         }
     }
 
-/*    static public void main(String[] args)
+    static public void main(String[] args)
     {
         try {
-            Server server = new Server("7fc56270e7a70fa81a5935b72eacbe29", "10002");
+            Server server = new Server(args[0], args[1]);
             server.work();
         } catch (IOException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
 
     }
-    */
 }

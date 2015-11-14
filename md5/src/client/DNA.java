@@ -1,4 +1,4 @@
-package common;
+package client;
 
 /**
  * Created by morsk on 10/31/2015.

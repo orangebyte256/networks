@@ -7,6 +7,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
@@ -71,11 +72,16 @@ public class Client {
     }
     private int getNum(byte[] arr)
     {
-        return Integer.parseInt(Arrays.toString(arr));
+        String str = new String(arr, StandardCharsets.UTF_8);
+        return Integer.parseInt(str);
     }
     void work() throws IOException, NoSuchAlgorithmException {
         while(true)
         {
+            try {
+              Thread.sleep(1000);
+            } catch (InterruptedException ie) {
+            }
             Socket server = makeSocket();
             byte[] rangeByte = new byte[Parameters.MAX_SIZE];
             output.write(Message.GET_WORK.toByte());
@@ -92,12 +98,13 @@ public class Client {
                 {
                     Socket socket = makeSocket();
                     output.write(Message.FINDED.toByte());
-                    output.write(String.valueOf(i).getBytes());
+                    output.write(dna.getBytes());
                     socket.close();
                     return;
                 }
             }
             server = makeSocket();
+            System.err.println(num);
             output.write(Message.CALCULATED.toByte());
             output.write(String.valueOf(num).getBytes());
             server.close();
@@ -106,7 +113,7 @@ public class Client {
     public static void main(String []args)
     {
         try {
-            Client client = new Client("localhost", "10002");
+            Client client = new Client(args[0], args[1]);
             client.work();
         } catch (IOException e) {
             e.printStackTrace();
