@@ -41,16 +41,22 @@ public class Server {
             Iterator<SelectionKey> keyIterator = selectedKeys.iterator();
             while(keyIterator.hasNext()) {
                 SelectionKey key = keyIterator.next();
+                if(!key.isValid())
+                {
+                    continue;
+                }
                 if(key.isAcceptable()) {
                     SocketChannel s = proxy.accept();
                     pipesManager.add(new Pipe(s, selector));
                 } else if (key.isReadable()) {
+                    System.out.println("Read event");
                     SocketChannel channel = (SocketChannel) key.channel();
                     Pipe pipe = pipesManager.get(channel);
                     pipe.read(channel, key);
                 }
                 else if (key.isWritable())
                 {
+                    System.out.println("Write event");
                     SocketChannel channel = (SocketChannel) key.channel();
                     Pipe pipe = pipesManager.get(channel);
                     pipe.write(channel, key);
